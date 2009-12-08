@@ -102,6 +102,9 @@ MainAssistant.prototype.DisplayStats = function(transport) {
 	    /* normally the service runs every 5 min, we give it 6 */
 	    this.controller.get('warning').innerHTML = "Warning: org.daemon.de.netstat.service is not running!";
 	}
+	else {
+	    this.controller.get('warning').innerHTML = '';
+	}
     }
     catch (err) {
         Mojo.Log.error("MainAssistant.DisplayStats", err);
