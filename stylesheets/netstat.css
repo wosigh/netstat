@@ -1,0 +1,6 @@
+/* Put Application specific CSS here. */
+.palm-page-header .header {
+	background-image: url(../miniicon.png);
+	background-repeat:no-repeat; 
+	margin-left: 3px; margin-top: 3px;
+}

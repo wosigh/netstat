@@ -1,0 +1,49 @@
+<div id='main'>
+        <div class="palm-page-header multi-line">
+	       <div class="palm-page-header-wrapper">
+		     <div class="header" id="title">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Netstat 1.0.0</div>
+	       </div>
+        </div>
+        <div id="interfaces" class="palm-group">
+                <div class="palm-group-title">
+                        <span>Traffic per interface this month</span>
+                </div>
+		<div class="palm-list">
+                        <div class="palm-row first">
+                                <div class="palm-row-wrapper" style="padding-top: 3px;">
+                                        <div class="label" style="margin-top: 3px;"><img src="images/wifi.png"/></div>
+					<div id="wifigraph" style="padding-left: 10px"></div>
+                                </div>
+                        </div>
+                        <div class="palm-row">
+                                <div class="palm-row-wrapper" style="padding-top: 3px;">
+                                        <div class="label" style="margin-top: 3px;"><img src="images/data.png"/></div>
+					<div id="wangraph" style="padding-left: 10px"></div>
+                                </div>
+                        </div>
+                        <div class="palm-row">
+                                <div class="palm-row-wrapper" style="padding-top: 3px;">
+                                        <div class="label" style="margin-top: 3px;"><img src="images/bluetooth.png"/></div>
+					<div id="btgraph" style="padding-left: 10px"></div>
+                                </div>
+                        </div>
+			<div class="palm-row last">
+                                <div class="palm-row-wrapper" style="padding-top: 3px;">
+                                        <div class="label">Last Update</div>
+					<div id="lastupdate" style="padding-left: 10px; padding-top:13px;"></div>
+                                </div>
+                        </div>
+                </div>
+        </div>
+
+	<div style="color: red;" id="warning"></div>
+
+	<div x-mojo-element="Button" id="reloadbutton" class="buttonClass" name="reloadbutton"></div>
+	
+	<!-- Footer -->
+	<div id="app-footer" style="text-align: center">
+		<hr/>
+		&copy; 2009 <a href="http://www.daemon.de/">Debilater</a>
+	</div>        
+</div>
+
