@@ -100,7 +100,7 @@ MainAssistant.prototype.DisplayStats = function(transport) {
 	diff = now - json.timestamp;
 	if(diff > 360) {
 	    /* normally the service runs every 5 min, we give it 6 */
-	    this.controller.get('warning').innerHTML = "Warning: netstatd daemon is not running!";
+	    this.controller.get('warning').innerHTML = "Warning: org.daemon.de.netstat.service is not running!";
 	}
 	else {
 	    this.controller.get('warning').innerHTML = '';
