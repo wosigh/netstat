@@ -16,6 +16,7 @@ function MainAssistant() {
 MainAssistant.prototype.setup = function() {
     try {
 	this.ShowStats();
+	/*
 	this.controller.setupWidget("reloadbutton",
 				    this.attributes = { },
 				    this.model = {
@@ -24,7 +25,7 @@ MainAssistant.prototype.setup = function() {
 					disabled: false
 				    });
 	Mojo.Event.listen(this.controller.get('reloadbutton'), Mojo.Event.tap, this.ShowStats.bind(this));
-
+        */
 	this.appMenuModel = {
             visible: true,
             items: [
@@ -32,6 +33,10 @@ MainAssistant.prototype.setup = function() {
             ]
         };
 	this.controller.setupWidget(Mojo.Menu.appMenu, {omitDefaultItems: true}, this.appMenuModel);
+
+	/* reload the app periodically */
+	this.wakeupFunction = this.ShowStats.bind(this);
+	this.wakeupTaskId = this.controller.window.setTimeout(this.wakeupFunction, 300000);
 
 	// console.log("msg");
     }
@@ -48,7 +53,7 @@ MainAssistant.prototype.handleCommand = function (event) {
 	if(event.type == Mojo.Event.command) {      
             switch (event.command) {
             case 'do-about':
-		this.controller.stageController.pushScene("showabout");
+		this.controller.stageController.pushScene({name:"showabout",transition:Mojo.Transition.crossFade} );
 		break;
             }
 	}
@@ -65,6 +70,8 @@ MainAssistant.prototype.ShowStats = function() {
     try {
 	var statsfile   = "/media/internal/.app-storage/file_.var.usr.palm.applications.org.daemon.de.netstat_0/stats.json"
 	var version     = 1;
+
+	Mojo.Log.error("ShowStats() called");
 
 	new Ajax.Request(statsfile, {
 	    requestHeaders: {Accept: 'application/json'},
@@ -105,6 +112,8 @@ MainAssistant.prototype.DisplayStats = function(transport) {
 	else {
 	    this.controller.get('warning').innerHTML = '';
 	}
+
+	this.wakeupTaskId = this.controller.window.setTimeout(this.wakeupFunction, 300000);
     }
     catch (err) {
         Mojo.Log.error("MainAssistant.DisplayStats", err);
@@ -117,5 +126,6 @@ MainAssistant.prototype.deactivate = function(event) {
 }
 
 MainAssistant.prototype.cleanup = function(event) {
+    this.controller.window.clearTimeout(this.wakeupTaskId);
 }
 
