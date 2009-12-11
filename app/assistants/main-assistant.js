@@ -1,5 +1,10 @@
 /* -*-javascript-*- */
 
+/*
+ * keep track of netstatd absence
+ */
+var away = 0;
+
 function MainAssistant() {
         /* this is the creator function for your scene assistant object. It will be passed all the 
            additional parameters (after the scene name) that were passed to pushScene. The reference
@@ -36,8 +41,6 @@ MainAssistant.prototype.setup = function() {
 
 	/* reload the app periodically */
 	this.wakeupFunction = this.ShowStats.bind(this);
-	this.wakeupTaskId = this.controller.window.setTimeout(this.wakeupFunction, 300000);
-
 	// console.log("msg");
     }
     catch (err) {
@@ -71,7 +74,7 @@ MainAssistant.prototype.ShowStats = function() {
 	var statsfile   = "/media/internal/.app-storage/file_.var.usr.palm.applications.org.daemon.de.netstat_0/stats.json"
 	var version     = 1;
 
-	Mojo.Log.error("ShowStats() called");
+	Mojo.Log.info("ShowStats() called");
 
 	new Ajax.Request(statsfile, {
 	    requestHeaders: {Accept: 'application/json'},
@@ -97,22 +100,37 @@ MainAssistant.prototype.FailedToReadStats = function() {
 MainAssistant.prototype.DisplayStats = function(transport) {
     try {
 	var json = transport.responseText.evalJSON(true);
-	this.controller.get('wifigraph').innerHTML  = json.wifigraph;
-	this.controller.get('wangraph').innerHTML   = json.wangraph;
-	this.controller.get('btgraph').innerHTML    = json.btgraph;
-	this.controller.get('lastupdate').innerHTML = json.lastupdate;
+	if(json.wifigraph && json.wangraph && json.btgraph && json.lastupdate) {
+	    this.controller.get('wifigraph').innerHTML  = json.wifigraph;
+	    this.controller.get('wangraph').innerHTML   = json.wangraph;
+	    this.controller.get('btgraph').innerHTML    = json.btgraph;
+	    this.controller.get('lastupdate').innerHTML = json.lastupdate;
 
-	/* check if service is running */
-	var now = new Date().getTime() / 1000;
-	diff = now - json.timestamp;
-	if(diff > 360) {
-	    /* normally the service runs every 5 min, we give it 6 */
-	    this.controller.get('warning').innerHTML = "Warning: netstatd is not running!";
+	    /* check if service is running */
+	    var now = new Date().getTime() / 1000;
+	    diff = now - json.timestamp;
+	    if(diff > 310) {
+		if(away > 1) {
+		    /* normally the service runs every 5 min, we give it 3x5 */
+		    Mojo.Log.error("DisplayStats(): no updates by netstatd after 15 minutes!");
+		    this.controller.get('warning').innerHTML = "Warning: netstatd is not running!";
+		}
+		else {
+		    /* give it another 5 min */
+		    Mojo.Log.error("DisplayStats(): no updates by netstatd after " + away * 5 + " minutes, waiting ...");
+		    away+= 1;
+		}
+	    }
+	    else {
+		/* remove warning, if any */
+		this.controller.get('warning').innerHTML = '';
+		/* netstatd is back */
+		away = 0;
+	    }
 	}
 	else {
-	    this.controller.get('warning').innerHTML = '';
+	    this.controller.get('warning').innerHTML = "Warning: netstatd is not running!";
 	}
-
 	this.wakeupTaskId = this.controller.window.setTimeout(this.wakeupFunction, 300000);
     }
     catch (err) {
