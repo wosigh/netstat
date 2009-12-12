@@ -34,6 +34,8 @@ MainAssistant.prototype.setup = function() {
 	this.appMenuModel = {
             visible: true,
             items: [
+		Mojo.Menu.editItem,
+                { label: "Preferences...", command: "do-prefs"},
                 { label: "About...", command: 'do-about' }
             ]
         };
@@ -58,7 +60,13 @@ MainAssistant.prototype.handleCommand = function (event) {
             case 'do-about':
 		this.controller.stageController.pushScene({name:"showabout",transition:Mojo.Transition.crossFade} );
 		break;
-            }
+            case 'do-prefs':
+		this.controller.stageController.pushScene({name:"preferences",transition:Mojo.Transition.crossFade} );
+		break;
+            case 'do-help':
+		this.controller.stageController.pushScene({name:"help",transition:Mojo.Transition.crossFade} );
+		break;
+	    }
 	}
     }
     catch (err) {
