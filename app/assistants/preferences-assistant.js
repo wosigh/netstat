@@ -24,6 +24,15 @@ PreferencesAssistant.prototype.setup = function() {
     this.ChangeStartDayHandler = this.ChangeStartDay.bindAsEventListener(this);
     this.controller.listen("startday", Mojo.Event.propertyChange, this.ChangeStartDayHandler);
 
+    this.controller.setupWidget("resetbutton",
+                                this.attributes = { },
+                                this.model = {
+                                    label : "Reset Counters",
+                                    buttonClass: 'affirmative',
+                                    disabled: false
+                                });
+    Mojo.Event.listen(this.controller.get('resetbutton'), Mojo.Event.tap, this.ResetCounter.bind(this));
+
     /* open the database and start the cascade to display it's value */
     /* db location: /var/palm/data/file_.var.usr.palm.applications.org.daemon.de.netstat_0/000000000000001e.db */
     this.db = new Mojo.Depot(
@@ -31,6 +40,45 @@ PreferencesAssistant.prototype.setup = function() {
 	this.FetchPrefValue.bind(this),
 	this.dbError.bind(this)
     );
+}
+
+PreferencesAssistant.prototype.ResetCounter = function(event) {
+    try {
+	this.db.simpleAdd(
+	    "resetcounter", 1, 
+            function() {
+		Mojo.Log.error("Reset Counters flag set to 1");
+		/*
+                 * doesn't work and I can't figure out why!
+		this.controller.showAlertDialog({
+		    onChoose: function(value) { },
+		    title: "Reset Counters Forced",
+		    message: "Forced reset counters. It will take a few minutes for the daemon to reset. Be patient.",
+		    choices: [ {label:'OK', value:'OK', type:'color'} ]
+		});
+                */
+		Mojo.Controller.errorDialog("Forced reset counters. It will take a few minutes for the daemon to reset. Be patient.");
+	    }, 
+            function(transaction,result) { 
+		Mojo.Log.warn("Database save error (#", result.message, ") - Could not set resetcounter to 1")
+		Mojo.Controller.errorDialog("Database save error (#" + result.message + ") - Could not set resetcounter to 1");
+            }
+	);	
+    }
+    catch (err) {
+        Mojo.Log.error("ResetCounter()", err);
+        Mojo.Controller.errorDialog(err);
+    }
+}
+
+PreferencesAssistant.prototype.TellResetResult = function(event) {
+    try {
+	this.controller.get("resetmessage").innerHTML = "Counters have been resetted. It will take a few minutes until the daemon catches it";
+    }
+    catch (err) {
+        Mojo.Log.error("TellResetResult()", err);
+        Mojo.Controller.errorDialog(err);
+    }
 }
 
 PreferencesAssistant.prototype.FetchPrefValue = function() {

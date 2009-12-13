@@ -41,6 +41,16 @@ MainAssistant.prototype.setup = function() {
         };
 	this.controller.setupWidget(Mojo.Menu.appMenu, {omitDefaultItems: true}, this.appMenuModel);
 
+	 this.cmdMenuModel = {
+             visible:true,
+             items: [
+                 {},
+                 {},
+                 {label:$L('Reload'), icon:'sync', command:'sync'}
+             ]};
+        this.controller.setupWidget(Mojo.Menu.commandMenu, undefined, this.cmdMenuModel);
+
+
 	/* reload the app periodically */
 	this.wakeupFunction = this.ShowStats.bind(this);
 	// console.log("msg");
@@ -65,6 +75,9 @@ MainAssistant.prototype.handleCommand = function (event) {
 		break;
             case 'do-help':
 		this.controller.stageController.pushScene({name:"help",transition:Mojo.Transition.crossFade} );
+		break;
+	    case 'sync':
+		this.ShowStats();
 		break;
 	    }
 	}
