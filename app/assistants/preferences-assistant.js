@@ -31,7 +31,9 @@ PreferencesAssistant.prototype.setup = function() {
                                     buttonClass: 'affirmative',
                                     disabled: false
                                 });
-    Mojo.Event.listen(this.controller.get('resetbutton'), Mojo.Event.tap, this.ResetCounter.bind(this));
+
+    this.reloadHandler = this.ResetCounter.bind(this);
+    Mojo.Event.listen(this.controller.get('resetbutton'), Mojo.Event.tap, this.reloadHandler);
 
     /* open the database and start the cascade to display it's value */
     /* db location: /var/palm/data/file_.var.usr.palm.applications.org.daemon.de.netstat_0/000000000000001e.db */
@@ -173,6 +175,6 @@ PreferencesAssistant.prototype.deactivate = function(event) {
 }
 
 PreferencesAssistant.prototype.cleanup = function(event) {
-    this.controller.stopListening("startday", Mojo.Event.propertyChange,
-        this.ChangeStartDayHandler);
+    this.controller.stopListening("startday", Mojo.Event.propertyChange, this.ChangeStartDayHandler);
+    Mojo.Event.stopListening(this.controller.get('resetbutton'), Mojo.Event.tap, this.reloadHandler);
 }

@@ -56,14 +56,13 @@ HistoryAssistant.prototype.DisplayHistory = function(transport) {
 	for (var i=0; i<json.count; i++) {
 	    items.push(
 		{
-		    "Traffic": parseInt(json.items[i].rx) + parseInt(json.items[i].tx),
+		    "Traffic": json.items[i].bytes,
 		    "Date":    json.items[i].date
 		}
 	    );
 	}
 	this.listModel.items = items;
         this.controller.modelChanged(this.listModel);
-	
     }
     catch (err) {
         Mojo.Log.error("HistoryAssistant.DisplayHistory", err);
@@ -73,8 +72,15 @@ HistoryAssistant.prototype.DisplayHistory = function(transport) {
 
 HistoryAssistant.prototype.FailedToReadHistory = function() {
     try {
-	Mojo.Log.error("HistoryAssistant.FailedToReadHistory()", "Could not read stats file");
-	Mojo.Controller.errorDialog("No aggregate data so far for this interface!");
+	var items = new Array();
+	items.push(
+	    {
+		"Traffic": "No traffic history yet",
+		"Date":    ''
+	    }
+	);
+	this.listModel.items = items;
+        this.controller.modelChanged(this.listModel);
     }
     catch (err) {
         Mojo.Log.error("HistoryAssistant.FailedToReadHistory", err);
