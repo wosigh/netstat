@@ -19,5 +19,9 @@
     {
         "scenes": "help",
         "source": "app/assistants/help-assistant.js"
+    },
+    {
+        "scenes": "history",
+        "source": "app/assistants/history-assistant.js"
     }
 ]
