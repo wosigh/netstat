@@ -1,0 +1,4 @@
+- graphs
+- alert on % data usage based in treshold
+- fix description, remove O2 reverences
+- fix prerm script for daemon (looks for pidfile)
