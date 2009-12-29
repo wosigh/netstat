@@ -35,6 +35,19 @@ PreferencesAssistant.prototype.setup = function() {
     this.reloadHandler = this.ResetCounter.bind(this);
     Mojo.Event.listen(this.controller.get('resetbutton'), Mojo.Event.tap, this.reloadHandler);
 
+    this.LimitAttr = {
+        label: 'Traffic Limit in MB',
+	modelProperty: 'value',
+        min: 0,
+        max: 1000
+    };
+    this.LimitModel = { value: '' };
+
+    this.controller.setupWidget("limit", this.LimitAttr, this.LimitModel);
+
+    this.ChangeLimitHandler = this.ChangeLimit.bindAsEventListener(this);
+    this.controller.listen("limit", Mojo.Event.propertyChange, this.ChangeLimitHandler);
+
     /* open the database and start the cascade to display it's value */
     /* db location: /var/palm/data/file_.var.usr.palm.applications.org.daemon.de.netstat_0/000000000000001e.db */
     this.db = new Mojo.Depot(
@@ -87,11 +100,48 @@ PreferencesAssistant.prototype.FetchPrefValue = function() {
     /* db opened, fetch the value */
     try {
 	Mojo.Log.error("FetchPrefValue()","Database opened OK"); 
-	this.db.simpleGet("startday", this.SetStartDay.bind(this), 
-		     this.SetDefaultStartDay.bind(this));
+	this.db.simpleGet("startday", this.SetStartDay.bind(this), this.SetDefaultStartDay.bind(this));
+	this.db.simpleGet("limit",    this.SetLimit.bind(this), this.SetDefaultLimit.bind(this));
     }
     catch (err) {
 	Mojo.Log.error("FetchPrefValue()", err);
+        Mojo.Controller.errorDialog(err);
+    }
+}
+
+PreferencesAssistant.prototype.SetLimit = function(dbval) {
+    /* value fetched, set the settings screen to it, if any */
+    try {
+	if (Object.toJSON(dbval) == "{}" || dbval === null) { 
+            Mojo.Log.error("Retrieved empty or null value from DB"); 
+            this.SetDefaultLimit(); 
+	}
+	else {
+            Mojo.Log.error("Retrieved value from DB: " + dbval);
+	    if(dbval) {
+	      this.LimitModel.value = dbval;
+	    }
+	    else {
+	      this.LimitModel.value = 0;
+	    }
+	    this.controller.modelChanged(this.LimitModel);
+	} 
+    }
+    catch (err) {
+	Mojo.Log.error("PreferencesAssistant()", err);
+        Mojo.Controller.errorDialog(err);
+    }
+}
+
+
+PreferencesAssistant.prototype.SetDefaultLimit = function(dbval) {
+    /* default unlimited */
+    try {
+      this.LimitModel.value = 0;
+      this.controller.modelChanged(this.LimitModel);
+    }
+    catch (err) {
+	Mojo.Log.error("PreferencesAssistant()", err);
         Mojo.Controller.errorDialog(err);
     }
 }
@@ -138,6 +188,30 @@ PreferencesAssistant.prototype.SetDefaultStartDay = function(dbval) {
     }
 }
 
+PreferencesAssistant.prototype.ChangeLimit = function(event) {
+    /* event triggerd by user: traffic limit value changed.
+     * fetch it and store it to the db
+     */
+    try {
+      this.newlimit = this.LimitModel.value;
+	Mojo.Log.error("Preferences ChangeLimitHandler; value = ", this.newlimit);
+	this.db.simpleAdd(
+	    "limit", this.newlimit, 
+            function() {
+		Mojo.Log.error("Limit set to " + this.newlimit);
+	    }, 
+            function(transaction,result) { 
+		Mojo.Log.warn("Database save error (#", result.message, ") - can't save custom limit item.")
+		Mojo.Controller.errorDialog("Database save error (#" + result.message + ") - can't save custom traffic limit.");
+            }
+	);
+    }
+    catch (err) {
+	Mojo.Log.error("ChangeLimit()", err);
+        Mojo.Controller.errorDialog(err);
+    }
+}
+
 PreferencesAssistant.prototype.ChangeStartDay = function(event) {
     /* event triggerd by user: integer list value changed.
      * fetch it and store it to the db
@@ -176,5 +250,6 @@ PreferencesAssistant.prototype.deactivate = function(event) {
 
 PreferencesAssistant.prototype.cleanup = function(event) {
     this.controller.stopListening("startday", Mojo.Event.propertyChange, this.ChangeStartDayHandler);
+    this.controller.stopListening("limit", Mojo.Event.propertyChange, this.ChangeLimitHandler);
     Mojo.Event.stopListening(this.controller.get('resetbutton'), Mojo.Event.tap, this.reloadHandler);
 }

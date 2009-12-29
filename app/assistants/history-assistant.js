@@ -16,7 +16,6 @@ HistoryAssistant.prototype.setup = function() {
          * Image:       Interface Logo
          * Traffic:     Current Traffic
          * Interface:   Widget Name (eg wifigraph)
-         * Ifname:      Interface Name (eg eth0)
          * IsInterface: false if "lastupdate" item, else true
          */
 	
@@ -33,9 +32,9 @@ HistoryAssistant.prototype.setup = function() {
 	    items: []
 	}
 	this.controller.setupWidget('TrafficList', this.listAttributes, this.listModel);
-	this.controller.get('title').innerHTML = this.space + "Traffic History " + this.history.Ifname;
 
-	new Ajax.Request(this.dbdir + "aggregate-" + this.history.Ifname + ".json", {
+
+	new Ajax.Request(this.dbdir + "aggregate-" + this.history.Interface + ".json", {
 	    requestHeaders: {Accept: 'application/json'},
 	    method:     'get',
 	    onComplete: {},
@@ -63,6 +62,8 @@ HistoryAssistant.prototype.DisplayHistory = function(transport) {
 	}
 	this.listModel.items = items;
         this.controller.modelChanged(this.listModel);
+
+	this.controller.get('title').innerHTML = this.space + "Traffic History " + json.ifname;
     }
     catch (err) {
         Mojo.Log.error("HistoryAssistant.DisplayHistory", err);

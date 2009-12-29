@@ -24,6 +24,12 @@ function MainAssistant() {
 
 MainAssistant.prototype.setup = function() {
     try {
+        /* default traffic limit (0 == unlimited) */
+        this.limit = 0;
+
+	/* by default we are active */
+	this.active = true;
+
 	/* load stats.json */
 	this.ShowStats();
 
@@ -135,28 +141,70 @@ MainAssistant.prototype.ShowStats = function() {
     }
 }
 
+MainAssistant.prototype.noop = function() { }
+
+MainAssistant.prototype.FetchPrefValue = function() {
+    /* db opened, fetch the value */
+    try {
+	Mojo.Log.error("Main/FetchPrefValue()","Database opened OK"); 
+	this.db.simpleGet("limit", this.CheckLimit.bind(this), this.noop.bind(this));
+    }
+    catch (err) {
+	Mojo.Log.error("FetchPrefValue()", err);
+        Mojo.Controller.errorDialog(err);
+    }
+}
+
+MainAssistant.prototype.CheckLimit = function(dbval) {
+    /* value fetched */
+    try {
+	if (Object.toJSON(dbval) == "{}" || dbval === null) {
+	  ; /* do nothing */
+	}
+	else {
+	    if(dbval) {
+	      if ( this.rawtrafficwan > (dbval * 1024 * 1024) ) {
+		/* notify or warn */
+		/* FIXME: If banner acknowledged, save to DB and don't warn anymore (this time period) */
+		if(this.active) {
+		  this.controller.get('warning').innerHTML = "Warning: WAN traffic > " + dbval + "MB!";
+		}
+		else {
+		  Mojo.Controller.getAppController().showBanner("Warning: WAN traffic > " + dbval + "MB!", {source: 'notification'});
+		}
+	      }
+	    }
+	} 
+    }
+    catch (err) {
+	Mojo.Log.error("MainAssistant::CheckLimit()", err);
+        Mojo.Controller.errorDialog(err);
+    }
+}
 
 MainAssistant.prototype.FailedToReadStats = function() {
     Mojo.Log.error("MainAssistant.FailedToReadStats()", "Could not read stats file");
     Mojo.Controller.errorDialog("Netstat Service not running!");
 }
 
-
+MainAssistant.prototype.dbError = function() {
+    Mojo.Log.error("Preferences(): failed to open Mojo.Depot!");
+    Mojo.Controller.errorDialog("Preferences(): failed to open Mojo.Depot!");
+}
 
 MainAssistant.prototype.DisplayStats = function(transport) {
     try {
 	var json = transport.responseText.evalJSON(true);
 	if(json.wifigraph && json.wangraph && json.btgraph && json.lastupdate) {
-	    var itemgr = new Array('wifigraph', 'wangraph', 'btgraph');
-	    var items  = new Array();
+	    var graph = new Array('wifigraph', 'wangraph', 'btgraph');
+	    var items = new Array();
 
 	    for(var i=0; i<3; i++) {
 		items.push(
 		    {
-			"Image":       "<img src=\"images/" + itemgr[i] + ".png\"/>",
-			"Traffic":     json[itemgr[i]],
-			"Interface":   itemgr[i],
-			"Ifname":      this.ifnames[itemgr[i]],
+			"Image":       "<img src=\"images/" + graph[i] + ".png\"/>",
+			"Traffic":     json[graph[i]].traffic,
+			"Interface":   graph[i],
 			"IsInterface": true
 		    }
 		);
@@ -172,6 +220,15 @@ MainAssistant.prototype.DisplayStats = function(transport) {
 
 	    this.listModel.items = items;
             this.controller.modelChanged(this.listModel);
+
+	    /* check traffic limit */
+	    /* FIXME: use wangraph on production release */
+	    this.rawtrafficwan = json.wifigraph.rawtraffic;
+	    this.db = new Mojo.Depot(
+				     { name:"org.daemon.de.netstat", version: 1, replace: false },
+				     this.FetchPrefValue.bind(this),
+				     this.dbError.bind(this)
+				     );
 
 	    /* check if service is running */
 	    var now = new Date().getTime() / 1000;
@@ -207,6 +264,11 @@ MainAssistant.prototype.DisplayStats = function(transport) {
 }
 
 MainAssistant.prototype.deactivate = function(event) {
+  this.active = false;
+}
+
+MainAssistant.prototype.deactivate = function(event) {
+  this.active = true;
 }
 
 MainAssistant.prototype.cleanup = function(event) {
