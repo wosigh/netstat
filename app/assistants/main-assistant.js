@@ -72,7 +72,12 @@ MainAssistant.prototype.setup = function() {
 
 	/* reload the app periodically */
 	this.wakeupFunction = this.ShowStats.bind(this);
-    }
+
+	var stageDocument = this.controller.stageController.document; 
+	Mojo.Event.listen(stageDocument, Mojo.Event.stageActivate,   this.activateWindow.bindAsEventListener(this) );
+	Mojo.Event.listen(stageDocument, Mojo.Event.stageDeactivate, this.deactivateWindow.bindAsEventListener(this) );
+	
+	}
     catch (err) {
         Mojo.Log.error("MainAssistant.setup()", err);
         Mojo.Controller.errorDialog(err);
@@ -163,15 +168,19 @@ MainAssistant.prototype.CheckLimit = function(dbval) {
 	}
 	else {
 	    if(dbval) {
-	      if ( this.rawtrafficwan > (dbval * 1024 * 1024) ) {
+	      this.limitmb = dbval;
+	      if ( this.rawtrafficwan > (this.limitmb * 1024 * 1024) ) {
+		this.db.simpleGet("limitacknowledged", this.CheckLimitAck.bind(this), this.noop.bind(this));
 		/* notify or warn */
 		/* FIXME: If banner acknowledged, save to DB and don't warn anymore (this time period) */
+		/*
 		if(this.active) {
-		  this.controller.get('warning').innerHTML = "Warning: WAN traffic > " + dbval + "MB!";
+		  this.controller.get('warning').innerHTML = "Warning: WAN traffic > " + this.limitmb + "MB!";
 		}
 		else {
-		  Mojo.Controller.getAppController().showBanner("Warning: WAN traffic > " + dbval + "MB!", {source: 'notification'});
+		  Mojo.Controller.getAppController().showBanner("Warning: WAN traffic > " + this.limitmb + "MB!", {source: 'notification'});
 		}
+		*/
 	      }
 	    }
 	} 
@@ -180,6 +189,62 @@ MainAssistant.prototype.CheckLimit = function(dbval) {
 	Mojo.Log.error("MainAssistant::CheckLimit()", err);
         Mojo.Controller.errorDialog(err);
     }
+}
+
+MainAssistant.prototype.CheckLimitAck = function(dbval) {
+    /* limitacknowledged pref value fetched */
+    try {
+	if (Object.toJSON(dbval) == "{}" || dbval === null) {
+	  this.LimitWarning();
+	}
+	else {
+	  if(dbval) {
+	    if (dbval != 1) {
+	      this.LimitWarning();
+	    }
+	    else {
+	      /* limit already acknowledged, just warn if active */
+	      if(this.active) {
+		this.controller.get('warning').innerHTML = "Warning: WAN traffic > " + this.limitmb + "MB!";
+	      }
+	    }
+	  }
+	  else {
+	    this.LimitWarning();
+	  }
+	}
+    }
+    catch (err) {
+	Mojo.Log.error("MainAssistant::CheckLimit()", err);
+        Mojo.Controller.errorDialog(err);
+    }
+}
+
+MainAssistant.prototype.LimitWarning = function() {
+  try {
+    if(this.active) {
+      /* card active, notify and set ack flag */
+      this.controller.get('warning').innerHTML = "Warning: WAN traffic > " + this.limitmb + "MB!";
+      this.db.simpleAdd(
+			"limitacknowledged", 1, 
+			function() {
+			  Mojo.Log.error("limitacknowledged => 1");
+			}, 
+			function(transaction,result) { 
+			  Mojo.Log.warn("Database save error (#", result.message, ") - can't save limitacknowledged.");
+			  Mojo.Controller.errorDialog("Database save error (#" + result.message + ") - can't save limitacknowledged.");
+			}
+			);
+    }
+    else {
+      /* inactive, just drop a banner and leave the user with it */
+      Mojo.Controller.getAppController().showBanner("Warning: WAN traffic > " + this.limitmb + "MB!", {source: 'notification'});
+    }
+  }
+  catch (err) {
+    Mojo.Log.error("MainAssistant::LimitWarning()", err);
+    Mojo.Controller.errorDialog(err);
+  }
 }
 
 MainAssistant.prototype.FailedToReadStats = function() {
@@ -255,7 +320,7 @@ MainAssistant.prototype.DisplayStats = function(transport) {
 	else {
 	    this.controller.get('warning').innerHTML = "Warning: netstatd is not running!";
 	}
-	this.wakeupTaskId = this.controller.window.setTimeout(this.wakeupFunction, 300000);
+	this.wakeupTaskId = this.controller.window.setTimeout(this.wakeupFunction, 30000);
     }
     catch (err) {
         Mojo.Log.error("MainAssistant.DisplayStats", err);
@@ -264,10 +329,16 @@ MainAssistant.prototype.DisplayStats = function(transport) {
 }
 
 MainAssistant.prototype.deactivate = function(event) {
+}
+
+MainAssistant.prototype.activate = function(event) {
+}
+
+MainAssistant.prototype.deactivateWindow = function(event) {
   this.active = false;
 }
 
-MainAssistant.prototype.deactivate = function(event) {
+MainAssistant.prototype.activateWindow = function(event) {
   this.active = true;
 }
 

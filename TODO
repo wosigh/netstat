@@ -1,5 +1,10 @@
 - graphs
-- alert on % data usage based in treshold
+* alert on % data usage based in treshold
+- remember if treshold is known, reset on aggregate
 - fix description, remove O2 reverences
-- fix prerm script for daemon (looks for pidfile)
-- Ifname arrray must reflect real interface names not hardcoded one (ppp0 or rmnet0 for wangraph), OR write the graph name to the aggregate file from daemon instead of the phy. interface name
+* fix prerm script for daemon (looks for pidfile)
+* Ifname arrray must reflect real interface names not hardcoded one (ppp0 or rmnet0 for wangraph), OR write the graph name to the aggregate file from daemon instead of the phy. interface name
+
+
+
+*) DONE
