@@ -123,14 +123,33 @@ MainAssistant.prototype.handleCommand = function (event) {
     }
 }
 
-
-
 MainAssistant.prototype.ShowStats = function() {
     try {
-	var statsfile   = "/media/internal/.app-storage/file_.var.usr.palm.applications.org.daemon.de.netstat_0/stats.json"
+	var statsfile   = "/media/internal/.app-storage/file_.media.cryptofs.apps.usr.palm.applications.org.daemon.de.netstat_0/stats.json";
 	var version     = 1;
 
 	Mojo.Log.info("ShowStats() called");
+
+	new Ajax.Request(statsfile, {
+	    requestHeaders: {Accept: 'application/json'},
+	    method:     'get',
+	    onComplete: {},
+	    onSuccess:  this.DisplayStats.bind(this),
+	    onFailure:  this.ShowStatsVar.bind(this)
+	});
+    }
+    catch (err) {
+        Mojo.Log.error("MainAssistant.ShowStats", err);
+        Mojo.Controller.errorDialog(err);
+    }
+}
+
+MainAssistant.prototype.ShowStatsVar = function() {
+    try {
+	var statsfile   = "/media/internal/.app-storage/file_.var.usr.palm.applications.org.daemon.de.netstat_0/stats.json";
+	var version     = 1;
+
+	Mojo.Log.info("ShowStatsVar() called");
 
 	new Ajax.Request(statsfile, {
 	    requestHeaders: {Accept: 'application/json'},
