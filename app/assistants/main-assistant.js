@@ -306,8 +306,7 @@ MainAssistant.prototype.DisplayStats = function(transport) {
             this.controller.modelChanged(this.listModel);
 
 	    /* check traffic limit */
-	    /* FIXME: use wangraph on production release */
-	    this.rawtrafficwan = json.wifigraph.rawtraffic;
+	    this.rawtrafficwan = json.wangraph.rawtraffic;
 	    this.db = new Mojo.Depot(
 				     { name:"org.daemon.de.netstat", version: 1, replace: false },
 				     this.FetchPrefValue.bind(this),
