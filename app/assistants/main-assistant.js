@@ -278,6 +278,13 @@ MainAssistant.prototype.dbError = function() {
 
 MainAssistant.prototype.DisplayStats = function(transport) {
     try {
+
+	/* patch by cmusik, no json output, croak */
+	if (transport.responseText === "") {
+            this.ShowStatsVar();
+            return;
+        }
+
 	var json = transport.responseText.evalJSON(true);
 	if(json.wifigraph && json.wangraph && json.btgraph && json.lastupdate) {
 	    var graph = new Array('wifigraph', 'wangraph', 'btgraph');

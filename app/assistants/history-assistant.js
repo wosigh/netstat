@@ -2,7 +2,8 @@ function HistoryAssistant(history) {
     try {
 	this.history = history;
 	this.space   = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
-	this.dbdir   = "/media/internal/.app-storage/file_.var.usr.palm.applications.org.daemon.de.netstat_0/";
+	this.dbdirvar   = "/media/internal/.app-storage/file_.var.usr.palm.applications.org.daemon.de.netstat_0/";
+	this.dbdircrypt = "/media/internal/.app-storage/file_.media.cryptofs.apps.usr.palm.applications.org.daemon.de.netstat_0/";
     } catch (err) {
         Mojo.Log.error("HistoryAssistant()", err);
         Mojo.Controller.errorDialog(err);
@@ -33,13 +34,12 @@ HistoryAssistant.prototype.setup = function() {
 	}
 	this.controller.setupWidget('TrafficList', this.listAttributes, this.listModel);
 
-
-	new Ajax.Request(this.dbdir + "aggregate-" + this.history.Interface + ".json", {
+	new Ajax.Request(this.dbdircrypt + "aggregate-" + this.history.Interface + ".json", {
 	    requestHeaders: {Accept: 'application/json'},
 	    method:     'get',
 	    onComplete: {},
 	    onSuccess:  this.DisplayHistory.bind(this),
-	    onFailure:  this.FailedToReadHistory.bind(this)
+	    onFailure:  this.ReadHistoryVar.bind(this)
 	});
     }
     catch (err) {
@@ -48,8 +48,30 @@ HistoryAssistant.prototype.setup = function() {
     }
 }
 
+HistoryAssistant.prototype.ReadHistoryVar = function() {
+    try {
+	new Ajax.Request(this.dbdirvar + "aggregate-" + this.history.Interface + ".json", {
+	    requestHeaders: {Accept: 'application/json'},
+	    method:     'get',
+	    onComplete: {},
+	    onSuccess:  this.DisplayHistory.bind(this),
+	    onFailure:  this.FailedToReadHistory.bind(this)
+	});
+    }
+    catch (err) {
+        Mojo.Log.error("HistoryAssistant.ReadHistoryVar", err);
+        Mojo.Controller.errorDialog(err);
+    }
+}
+
 HistoryAssistant.prototype.DisplayHistory = function(transport) {
     try {
+	/* patch by cmusik, no json output, croak */
+	if (transport.responseText === "") {
+            this.ShowStatsVar();
+            return;
+        }
+
 	var json  = transport.responseText.evalJSON(true);
 	var items = new Array();
 	for (var i=0; i<json.count; i++) {
