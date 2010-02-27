@@ -68,7 +68,7 @@ HistoryAssistant.prototype.DisplayHistory = function(transport) {
     try {
 	/* patch by cmusik, no json output, croak */
 	if (transport.responseText === "") {
-            this.ShowStatsVar();
+            this.ReadHistoryVar();
             return;
         }
 

@@ -1,6 +1,6 @@
 {
 	"id":        "org.daemon.de.netstat",
-	"version":   "1.0.10",
+	"version":   "1.0.11",
 	"vendor":    "daemon.de",
 	"type":      "web",
 	"main":      "index.html",
