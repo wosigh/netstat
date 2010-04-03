@@ -1,0 +1,8 @@
+Package: org.daemon.de.netstatd
+Architecture: arm
+Priority: optional
+Section: net
+Version: 1.0.8
+Maintainer: Thomas Linden <debilater@googlemail.com>
+Source: http://www.daemon.de/PalmPreNetstat
+Description: org.daemon.de.netstatd

@@ -1,0 +1,42 @@
+#!/bin/sh
+
+APPID="org.daemon.de.netstatd"
+EVENTD="etc/event.d"
+DAEMON="usr/sbin/netstatd"
+BACKUP="usr/sbin/netstatd.in"
+
+if [ -z "$IPKG_OFFLINE_ROOT" ]; then
+    IPKG_OFFLINE_ROOT=/media/cryptofs/apps
+fi
+
+if test -e "/$EVENTD/$APPID"; then
+    # this is an update. make sure, the daemon doesn't
+    # run anymore, otherwise copying results in 0 byte file
+    /sbin/stop $APPID
+    sleep 2
+
+    pid=`/bin/ps axuw | /bin/grep netstatd | /bin/grep -v grep`
+    if test -n "$pid"; then
+	# damn, daemon failed to stop, kill it!
+	/bin/kill -9 $pid
+    fi
+
+    # check if the daemon file previously failed to copy
+    if test ! -s $IPKG_OFFLINE_ROOT/$DAEMON; then
+	# too bad!
+	cp $IPKG_OFFLINE_ROOT/$BACKUP $IPKG_OFFLINE_ROOT/$DAEMON
+
+	# check again
+	if test ! -s $IPKG_OFFLINE_ROOT/$DAEMON; then
+	    # dammit
+	    echo "Failed to update $APPID! Please try again!" > /dev/stderr
+	    exit 1
+	fi
+    fi
+fi
+
+cp $IPKG_OFFLINE_ROOT/$EVENTD/$APPID /$EVENTD/$APPID
+
+/sbin/start $APPID
+
+exit 0

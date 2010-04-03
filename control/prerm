@@ -1,0 +1,16 @@
+#!/bin/sh
+
+/sbin/stop org.daemon.de.netstatd
+
+sleep 2
+
+pid=`/bin/ps axuw | /bin/grep netstatd | /bin/grep -v grep`
+if test -n "$pid"; then
+    # damn, daemon failed to stop, kill it!
+    /bin/kill -9 $pid
+fi
+
+
+rm -f /etc/event.d/org.daemon.de.netstatd
+
+exit 0

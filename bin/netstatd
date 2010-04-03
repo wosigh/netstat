@@ -1,0 +1,535 @@
+#!/bin/sh
+#
+# org.daemon.de.netstat.service stats collector
+#
+# currently install to root supported only
+#
+# Copyright (c) 2009-2010 by Thomas Linden
+#
+# 
+#
+# Published under the terms of the BSD License.
+#
+
+#
+# initialize some vars
+me="/usr/sbin/netstatd"
+sql="/usr/bin/sqlite3"
+stats="/proc/net/dev"
+tmpstatsfile="/tmp/netstat.$$"
+delay="300"
+version="1.0.16"
+
+#
+# prefedine some sql code
+prefsql="select p.value from properties as p, toc as t where t.key = \"startday\" and t.id = p.frowid;"
+prefresetsql="select p.value from properties as p, toc as t where t.key = \"resetcounter\" and t.id = p.frowid;"
+prefresetidsql="select id from toc where key=\"resetcounter\";"
+preflimitack="select id from toc where key=\"limitacknowledged\";"
+preflsl=""
+startday="1"
+
+
+
+
+
+#
+# find location of preferences and json files
+# ok this indeed looks strange, but it's the location, where Mojo.Depot locates the prefs DB
+loc_pref_cr="/var/palm/data/file_.media.cryptofs.apps.usr.palm.applications.org.daemon.de.netstat_0"
+loc_db_cr="/media/internal/.app-storage/file_.media.cryptofs.apps.usr.palm.applications.org.daemon.de.netstat_0"
+loc_app_cr="/media/cryptofs/apps/usr/palm/applications/org.daemon.de.netstat"
+
+loc_pref_var="/var/palm/data/file_.var.usr.palm.applications.org.daemon.de.netstat_0"
+loc_db_var="/media/internal/.app-storage/file_.var.usr.palm.applications.org.daemon.de.netstat_0"
+loc_app_var="/var/usr/palm/applications/org.daemon.de.netstat"
+
+if test -d "${loc_app_cr}"; then
+    # ok, 1.3.5 based install or higher
+    prefdir=${loc_pref_cr}
+    dbdir=${loc_db_cr}
+    logger -t $me "we are running on webos 1.3.5 or higher, initializing"
+
+    if test -d "${loc_db_var}"; then
+	# an old db dir exists, migrate it to the new location
+	if test -d "${loc_db_cr}"; then
+	    # argl, new location already exists. migrate the db and
+	    # remove the old db dir
+	    logger -t $me "both new and old db locations exist. migrating old to new..."
+	    newdb=`finddb`
+	    $sql ${loc_db_var}/*.db .dump | $sql $newdb
+	    cp ${loc_db_var}/aggregate* ${loc_db_cr}/
+	    logger -t $me "migration done"
+	    rm -rf ${loc_db_var}
+	else
+	    # first run in new env, just move the db dir
+	    mv ${loc_db_var} ${loc_db_cr}
+	fi
+    fi
+
+    if test -d "${loc_pref_var}"; then
+	# pre-1.3.5 pref-db exists, this is configured in PalmDatabase.db3, we'll stay with that
+	prefdir=${loc_pref_var}
+    fi
+elif test -d "${loc_app_var}"; then
+    # nope, we are below 1.3.5
+    prefdir=${loc_pref_var}
+    dbdir=${loc_db_var}
+    logger -t $me "we are running on webos 1.3.1 or below, initializing"
+else
+    # holla, daemon installed, app not!
+    # we'll exit from here after 5 minutes, upstart
+    # will re-start us anyways. maybe in the meantime
+    # the user installed the app.
+    logger -t $me "will do nothing because netstat app is not installed!"
+    sleep 300
+    exit
+fi
+
+
+statsfile="$dbdir/stats.json"
+
+
+
+
+
+if test -n "$1"; then
+    echo "$0 version $version, package org.daemon.de.netstatd"
+    exit
+fi
+
+
+#
+# SQL functions 
+createtables () {
+    # create tables if the doesn't exist
+    $sql $db "CREATE TABLE IF NOT EXISTS abslast    (interface char(8), rxabs int(32), txabs int(32));"
+    $sql $db "CREATE TABLE IF NOT EXISTS stats      (id timestamp, interface char(8), rx int(32), tx int(32));"
+    $sql $db "CREATE TABLE IF NOT EXISTS aggregated (id timestamp, interface char(8), rx int(32), tx int(32));"
+    $sql $db "CREATE TABLE IF NOT EXISTS resetted   (id timestamp, interface char(8));"
+}
+
+
+getabstx() {
+    # return absolute rx for given interface
+    interface="$1"
+    txabs=`$sql $db "SELECT txabs FROM abslast WHERE interface=\"$interface\""`
+    echo $txabs
+}
+
+getabsrx() {
+    # return absolute tx for given interface
+    interface="$1"
+    rxabs=`$sql $db "SELECT rxabs FROM abslast WHERE interface=\"$interface\""`
+    echo $rxabs
+}
+
+setabs () {
+    # update absolute values for given interfaces
+    interface="$1"
+    rxabs="$2"
+    txabs="$3"
+    $sql $db "DELETE FROM abslast WHERE interface=\"$interface\""
+    $sql $db "INSERT INTO abslast VALUES(\"$interface\", $rxabs, $txabs)"
+}
+
+setcurrent () {
+    # add stats entry for current run
+    interface="$1"
+    rx="$2"
+    tx="$3"
+    $sql $db "INSERT INTO stats VALUES(CURRENT_TIMESTAMP, \"$interface\", $rx, $tx)"
+}
+
+#
+# /bin/sh has an integer limitation as in:
+#   test 2380019993 -gt 1024
+#   sh: 2380019993: out of range
+# and expr also has a limitation (a bit larger)
+# also expr only returns integers, we want float.
+#
+# therefore we are using awk now for byte to human
+# readable conversion
+bytefactor () {
+    bytes="$1"
+
+    converted=`echo $bytes | awk  '
+    BEGIN { CONVFMT = "%.3g" }
+    {
+        bytes = $1
+	if (bytes > 1000) {
+		kbytes = bytes / 1024
+		if (kbytes > 1000) {
+			mbytes = kbytes / 1024
+			if (mbytes > 1000) {
+				gbytes = mbytes / 1024
+                                if (gbytes > 1000) {
+                                        tbytes = gbytes / 1024
+                                        print tbytes " TB"
+                                }
+                                else
+				        print gbytes " GB"
+                        }
+			else
+				print mbytes " MB"
+                }
+		else
+			print kbytes " KB"
+        }
+	else
+		print bytes " Bytes"
+    }'`
+    
+    echo $converted
+}
+
+
+#
+# we now do all the math using awk
+# which is much more reliable than expr.
+#
+# we support 2 numbers and an operator
+# x will be replaced by *.
+#
+# both numbers and operand will be placed
+# into awk by using the shells interpolation
+# feature. so, $A, $B, $OP are shell variables
+# visible to math() and NOT awk variables.
+math () {
+    A=$1
+    OP=$2
+    B=$3
+
+    if test -z "$B"; then
+	# incomplete expression
+	if test -n "$A"; then
+	    # only $B missing
+	    echo $A
+	else
+	    # no expression at all
+	    echo 0
+	fi
+    else
+	if test "$OP" = "x"; then
+	    # translate x to *
+	    OP='*'
+	fi
+
+	if test "$OP" = "/" -a "$B" = "0"; then
+	    # avoid division by zero error
+	    echo 0
+	else
+	    result=`awk "
+               BEGIN {
+                   CONVFMT = \"%.3g\"
+                   print $A $OP $B
+               }"`
+	    echo $result
+	fi
+    fi
+}
+
+
+getgraphname () {
+    interface="$1"
+    graph="wifigraph"
+
+    if test "$interface" = "ppp0" -o "$interface" = "rmnet0"; then
+	graph="wangraph"
+    fi
+    if test "$interface" = "bsl0"; then
+	graph="btgraph"
+    fi
+
+    echo $graph
+}
+
+
+getstats () {
+    interface="$1"
+
+    # get summary of all rx+tx of current month
+    bytes=`$sql $db "SELECT sum(rx + tx) FROM stats WHERE interface=\"$interface\""`
+    
+    echo $bytes
+}
+
+getreset() {
+    interface="$1"
+    ts=`$sql $db "SELECT id FROM resetted WHERE interface = \"$interface\" AND id like \"${year}-${month}-${day}%\"`
+    if test -n "$ts"; then
+	# we had already a reset
+	echo 1
+    else
+	echo ""
+    fi
+}
+
+aggregate() {
+    interface="$1"
+    graph=`getgraphname $interface`
+
+    reset=`getreset $interface`
+    if test -z "$reset"; then
+	# no reset so far
+
+	logger -t $me "resetting counters"
+
+	# get summary of all rx+tx since last reset
+	rx=`$sql $db "SELECT sum(rx) FROM stats WHERE interface=\"$interface\""`
+	tx=`$sql $db "SELECT sum(tx) FROM stats WHERE interface=\"$interface\""`
+
+        # update aggregated data
+	$sql $db "INSERT INTO aggregated VALUES(CURRENT_TIMESTAMP, \"$interface\", $rx, $tx)"
+
+	# remove stats data for this interface
+	$sql $db "DELETE FROM stats WHERE interface=\"$interface\""
+
+	# register interface counter reset
+	$sql $db "INSERT INTO resetted VALUES(CURRENT_TIMESTAMP, \"$interface\")"
+
+	# create aggregate json file
+	json="$dbdir/aggregate-$graph.json"
+	echo "{"               > $json
+	echo "  \"items\": [" >> $json
+
+	# fetch aggregated data and output in json format
+	$sql -separator ' ' $db "SELECT id, rx, tx FROM aggregated WHERE interface=\"$interface\" ORDER BY id DESC" | while read adate atime arx atx; do
+	    bytes=`math $arx + $atx`
+	    hrbytes=`bytefactor $bytes`
+	    echo "    {"                          >> $json
+	    echo "       \"date\": \"$adate\","   >> $json
+	    echo "       \"time\": \"$atime\","   >> $json
+	    echo "      \"bytes\": \"$hrbytes\"," >> $json
+	    echo "   \"rawbytes\": \"$bytes\","   >> $json
+	    echo "    },"                         >> $json
+	done
+	count=`grep date $json | wc -l`
+	echo "  ],"                         >> $json
+	echo "  \"count\": \"$count\","     >> $json
+	echo "  \"ifname\": \"$interface\"" >> $json
+	echo "}"                            >> $json
+
+	# reset preference limit ack flag
+	resetlimitack
+    fi
+}
+
+
+finddb () {
+    # so, this is really ugly. really. When the app opens the database
+    # it gets moved. So, if we start here with 0000000000000001.db,
+    # it ends up in 0000000000000002.db, 0000000000000003.db and so forth.
+    # I assume it moves it to a new version each time it opens the db.
+    # for whatever fucking stupid reason. damn stupid.
+    default="$dbdir/0000000000000001.db"
+    if ls $dbdir/*.db > /dev/null 2>&1; then
+	# not empty
+	mydb=`ls $dbdir/*.db`
+        echo "$mydb"
+    else
+	echo $default
+    fi
+}
+
+findprefsdb () {
+    if ls $prefdir/*.db > /dev/null 2>&1; then
+	# not empty
+	prefdb=`ls $prefdir/*.db`
+	if test -z "$preflsl"; then
+	    # first seen, return the new value
+	    preflsl=`ls -l $prefdb`
+	    echo $prefdb
+	else
+	    # have already seen it
+	    newlsl=`ls -l $prefdb`
+	    if test "$newlsl" != "$preflsl"; then
+		# preferences value changed, fetch and update preflsl
+		preflsl="$newlsl"
+		echo $prefdb
+	    else
+		# nothing changed
+		:
+	    fi
+	fi
+    else
+	# no db so far
+	:
+    fi
+}
+
+findstartday () {
+    prefdb=`findprefsdb`
+    if test -n "$prefdb"; then
+	startday=`$sql $prefdb "$prefsql"`
+    fi
+    echo $startday
+}
+
+
+checkresetcounters() {
+    prefdb=`findprefsdb`
+    if test -n "$prefdb"; then
+	doreset=`$sql $prefdb "$prefresetsql"`
+	if test -n "$doreset"; then
+	    if test $doreset -eq 1; then
+		# reset counters forced
+		propid=`$sql $prefdb "$prefresetidsql"`
+		if test -n "$propid"; then
+		    # set the value to 0
+		    $sql $prefdb "UPDATE properties SET VALUE=\"0\" WHERE frowid=$propid"
+		    logger -t $me "user forced reset counters"
+		    echo 1
+		fi
+	    fi
+	fi
+    fi
+}
+
+
+
+resetlimitack() {
+    # reset "limitacknowledged" app preference to 0 on aggregate call.
+    prefdb=`findprefsdb`
+    if test -n "$prefdb"; then
+	propid=`$sql $prefdb "$preflimitack"`
+	if test -n "$propid"; then
+	    # set the value to 0
+	    $sql $prefdb "UPDATE properties SET VALUE=\"0\" WHERE frowid=$propid"
+	    echo 1
+	fi
+    fi
+}
+
+
+
+findppp () {
+    name="rmnet0"
+
+    if egrep "BUILDNAME.*Castle" /etc/palm-build-info > /dev/null 2>&1; then
+	# ok, we are on a palm pre
+	name="ppp0"
+	logger -t $me "this device is a palm pre, using $name as WAN interface"
+    else
+	logger -t $me "this device is a palm pixi, using $name as WAN interface"
+    fi
+
+    echo $name
+}
+
+
+# main program
+cd /
+
+
+# install signal handler, which removes the pidfile on finish or kill
+trap "exit" EXIT TERM INT
+
+logger -t $me "started"
+
+
+# which db to use, initialize it, if needed
+mkdir -p $dbdir
+db=`finddb`
+
+# initially create the tables (this doesn't do anything if the
+# database already exists)
+createtables
+
+# remove comments to enable full debugging
+#exec 2> $dbdir/debug.log
+#set -x
+
+# find out if we are running on a pre or a pixi and set wan interface
+# name accordingly
+ppp=`findppp`
+
+
+# main loop, runs until kill
+while : ; do
+    echo "{" > $tmpstatsfile
+    day=`date +%d`
+    year=`date +%Y`
+    month=`date +%m`
+    resetday=`findstartday`
+    forcereset=`checkresetcounters`
+
+    for interface in eth0 $ppp bsl0; do
+	# fetch current rx+tx values from sys classes
+	sysrx="/sys/class/net/${interface}/statistics/rx_bytes"
+	systx="/sys/class/net/${interface}/statistics/tx_bytes"
+	rx=0
+	tx=0
+	if test -e "$sysrx"; then
+	    rx=`cat $sysrx`
+	fi
+	if test -e "$systx"; then
+	    tx=`cat $systx`
+	fi
+
+	# get absolute rx+tx values from database
+	absrx=`getabsrx $interface`
+	abstx=`getabstx $interface`
+
+	# always write current rx+tx as last absolute values     
+	setabs $interface $rx $tx
+
+        # check if last absolute values are larger than
+	# current ones, which means there have been an interface
+	# reset since the last update. if they are larger, keep
+	# rx+tx the current values, otherwise (checked here),
+	# write the diff to the last absolute values to the db
+	if test -n "$absrx" -a -n "$abstx"; then
+	    if test $absrx -le $rx; then
+		# absrx is smaller or equal than current, make current rx a diff from that
+		rx=`math $rx - $absrx`
+	    fi
+	    if test $abstx -le $tx; then
+		tx=`math $tx - $abstx`
+	    fi
+	fi
+
+	# finally write the rx+tx values since last update to db
+	setcurrent $interface $rx $tx
+
+	# get stats for current month
+	rawtraffic=`getstats $interface`
+	graph=`getgraphname $interface`
+	traffic="0 Bytes"
+	if test -n "$rawtraffic"; then
+	    traffic=`bytefactor $rawtraffic`
+	fi
+	echo "  \"$graph\": {"                     >> $tmpstatsfile
+	echo "    \"traffic\":    \"$traffic\","   >> $tmpstatsfile
+	echo "    \"rawtraffic\": \"$rawtraffic\"" >> $tmpstatsfile
+	echo "  },"                                >> $tmpstatsfile
+
+	# look if we are at aggregate time
+	if test -n "$forcereset"; then
+	    aggregate $interface
+	else
+	    if test "$day" = "$resetday"; then
+		aggregate $interface
+	    fi
+	fi
+    done
+
+    # save lastupdate
+    echo "  \"lastupdate\": \"`date +'%H:%M:%S %m/%d/%Y'`\"," >> $tmpstatsfile
+    echo "  \"timestamp\": \"`date +%s`\"" >> $tmpstatsfile
+    echo "}" >> $tmpstatsfile
+
+    # set output for app
+    cp $tmpstatsfile $statsfile
+
+    sleep $delay
+
+    # which db to use, we do this just every loop. bitches.
+    db=`finddb`
+
+    if test ! -f "$db"; then
+	createtables
+    fi
+done
+
+logger -t $me "stopped"
