@@ -1,16 +1,31 @@
 #!/bin/sh
 
-/sbin/stop org.daemon.de.netstatd
+PID="org.daemon.de.netstat"
+SID="org.daemon.de.netstatd"
+EXE="netstatd"
 
-sleep 2
-
-pid=`/bin/ps axuw | /bin/grep netstatd | /bin/grep -v grep`
-if test -n "$pid"; then
-    # damn, daemon failed to stop, kill it!
-    /bin/kill -9 $pid
+# Handle execution as pmPreRemove.script
+if [ -z "$IPKG_OFFLINE_ROOT" ]; then
+  IPKG_OFFLINE_ROOT=/media/cryptofs/apps
+  mount -o remount,rw /
 fi
 
+APPS=/media/cryptofs/apps
 
-rm -f /etc/event.d/org.daemon.de.netstatd
+[ -d $APPS ] || { echo "Requires webOS 1.3.5 or later" ; exit 1 ; }
+
+# Stop the service if running
+/sbin/stop ${SID} || true
+
+# Make sure it's dead
+sleep 2
+killall -9 ${SID} || true
+killall -9 ${EXE} || true
+
+# Remove the upstart script
+rm -f /etc/event.d/${SID} /var/palm/event.d/${SID}
+
+# Remove the daemon script
+rm -f /var/usr/sbin/${SID} /var/usr/sbin/${EXE} /var/usr/sbin/${EXE}.in
 
 exit 0
