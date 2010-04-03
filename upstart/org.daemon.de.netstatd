@@ -10,7 +10,7 @@ nice 5
 # Restart the collector if it exits/dies
 respawn
 
-exec /bin/sh /var/usr/sbin/org.daemon.de.netstatd
+exec /bin/sh /var/usr/sbin/netstatd
 
 # end of file
 

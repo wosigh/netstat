@@ -19,13 +19,12 @@ APPS=/media/cryptofs/apps
 
 # Make sure it's dead
 sleep 2
-killall -9 ${SID} || true
 killall -9 ${EXE} || true
 
 # Remove the upstart script
 rm -f /etc/event.d/${SID} /var/palm/event.d/${SID}
 
 # Remove the daemon script
-rm -f /var/usr/sbin/${SID} /var/usr/sbin/${EXE} /var/usr/sbin/${EXE}.in
+rm -f /var/usr/sbin/${EXE}
 
 exit 0

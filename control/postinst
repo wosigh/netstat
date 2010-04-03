@@ -27,13 +27,12 @@ fi
 
 # Make sure it's dead
 sleep 2
-killall -9 ${SID} || true
 killall -9 ${EXE} || true
 
 # Install the daemon script
 mkdir -p /var/usr/sbin/
-rm -f /var/usr/sbin/${SID} /var/usr/sbin/${EXE} /var/usr/sbin/${EXE}.in
-install -m 755 $APPS/usr/palm/applications/${PID}/bin/${EXE} /var/usr/sbin/${SID}
+rm -f /var/usr/sbin/${EXE}
+install -m 755 $APPS/usr/palm/applications/${PID}/bin/${EXE} /var/usr/sbin/${EXE}
 
 # Start the service
 /sbin/start ${SID}
